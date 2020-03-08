@@ -1,0 +1,188 @@
+<html>
+<head>
+<style>
+    body, button {
+        font-size: 20pt;
+    }
+
+    span.clickable {
+        cursor: pointer;
+    }
+
+    span.clickable:hover {
+        background-color: lightblue;
+    }
+
+    span.clickable > span.clickable:hover {
+        background-color: lightyellow;
+    }
+
+    span.clickable > span.clickable > span.clickable:hover {
+        background-color: lightgreen;
+    }
+
+    span.clickable > span.clickable > span.clickable > span.clickable:hover {
+        background-color: pink;
+    }
+
+    span.clickable > span.clickable > span.clickable > span.clickable > span.clickable:hover {
+        background-color: lightgray;
+    }
+
+    span {
+        padding: 10px;
+    }
+</style>
+</head>
+<body>
+    <textarea id="code"></textarea>
+    <button onclick="render()">Click me!</button>
+    <div id="result">
+        <span></span>
+    </div>
+</body>
+
+<script>
+function render() {
+    const code = document.getElementById('code').value;
+
+    const brett = evaluate(parse(code));
+    document.getElementById('result').firstChild.replaceWith(expandedFunctionNode(evaluate(parse(code))));
+}
+
+function expandedFunctionNode(x) {
+    if (x.type === 'Atom') {
+        const atom = document.createElement('span');
+        atom.appendChild(document.createTextNode(x.evaluatedValue));
+        return atom;
+    }
+
+    const [first, ...rest] = x.evaluatedValues;
+
+    const span = document.createElement('span');
+    span.className = 'clickable'
+    span.onclick = () => span.replaceWith(collapsedFunctionNode(x));
+    span.addEventListener('click', e => e.stopPropagation());
+    span.appendChild(document.createTextNode('('));
+    x.evaluatedValues.forEach(item => span.appendChild(expandedFunctionNode(item)));
+    span.appendChild(document.createTextNode(')'));
+
+    return span;
+}
+
+function collapsedFunctionNode(x) {
+    const expandButton = document.createElement('span');
+    expandButton.className = 'clickable';
+    expandButton.appendChild(document.createTextNode(x.evaluatedValue));
+    expandButton.onclick = () => expandButton.replaceWith(expandedFunctionNode(x));
+    expandButton.addEventListener('click', e => e.stopPropagation());
+
+
+    return expandButton;
+}
+
+function parse(x) {
+    return parseList(x, [])[1][0];
+}
+
+function parseList(string, accumulatedList) {
+    if (string.length === 0) {
+        return ['', accumulatedList];
+    }
+
+    const first = string.charAt(0);
+    const rest = string.substring(1);
+
+    if (first === '(') {
+        const [newString, newList] = parseList(rest, []);
+        return parseList(newString, [...accumulatedList, {type: 'List', values: newList}]);
+    } else if (first === ')') {
+        return [rest, accumulatedList];
+    } else if (first === ' ' || first === '\n') {
+        return parseList(rest, accumulatedList);
+    } else {
+        const [token, ...tokens] = string.split(/([ \n\(\)])/);
+
+        return parseList(tokens.join(''), [...accumulatedList, {type: 'Atom', value:
+            ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].includes(token.charAt(0))
+                ? parseInt(token)
+                : token}])
+    }
+}
+
+function evaluate(x) {
+    if (x.type === 'Atom') {
+        return {
+            type: 'Atom',
+            value: x.value,
+            evaluatedValue: x.value
+        };
+    }
+
+    const evaluatedValues = x.values.map(evaluate);
+    const [fn, a, b, c, ...rest] = evaluatedValues.map(evaluatedValue => evaluatedValue.evaluatedValue);
+
+    let result;
+    let _;
+    switch(fn) {
+        case '+':
+            result = a + b;
+            break;
+        case '*':
+            result = a * b;
+            break;
+        case '-':
+            if (b) {
+                result = a - b;
+            } else {
+                result = 0 - a;
+            }
+            break;
+        case '/':
+            result = a / b;
+            break;
+        case 'if':
+            result = a ? b : c;
+            break;
+        case '=':
+            result = a === b;
+            break;
+        case '>':
+            result = a > b;
+            break;
+        case '>=':
+            result = a >= b;
+            break;
+        case '<':
+            result = a < b;
+            break;
+        case '<=':
+            result = a <= b;
+            break;
+        case 'sqrt':
+            result = Math.sqrt(a);
+            break;
+        case 'cons':
+            result = [a, ...b];
+            break;
+        case 'car':
+            [result, ..._] = a;
+            break;
+        case 'cdr':
+            [_, ...result] = a;
+            break;
+        case 'list':
+            result = [a, b, c, ...rest];
+            break;
+    }
+
+    return {
+        type: 'List',
+        values: x.values,
+        evaluatedValue: result,
+        evaluatedValues: evaluatedValues
+    }
+
+}
+</script>
+</html>
